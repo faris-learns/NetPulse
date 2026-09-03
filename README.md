@@ -55,8 +55,9 @@ See `dashboard/README.md` (coming in later build phase).
 
 ## Team
 
-- Faris — [add role/partner name here]
-
+- Faris 
+- Meshal 
+  
 ## License
 
 MIT — see [LICENSE](./LICENSE)
