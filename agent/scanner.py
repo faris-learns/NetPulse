@@ -20,7 +20,7 @@ import nmap
 # TODO (week 1): confirm this matches your own network's subnet.
 # Find yours with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac/Linux)
 # — look for something like 192.168.1.0/24.
-SUBNET = "192.168.1.0/24"
+SUBNET = "192.168.68.0/24"
 
 # A small starter set of commonly-checked ports. Expand this as you
 # learn more about which services are common attack surfaces.
