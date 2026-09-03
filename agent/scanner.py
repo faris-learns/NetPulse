@@ -16,14 +16,10 @@ pushes scan results out. See README.md "Security principles".
 
 import json
 import nmap
+import requests
 
-# TODO (week 1): confirm this matches your own network's subnet.
-# Find yours with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac/Linux)
-# — look for something like 192.168.1.0/24.
 SUBNET = "192.168.68.0/24"
 
-# A small starter set of commonly-checked ports. Expand this as you
-# learn more about which services are common attack surfaces.
 COMMON_PORTS = "21,22,23,80,443,445,3389,8080"
 
 
@@ -49,14 +45,13 @@ def scan_ports(scanner: nmap.PortScanner, host: str, ports: str) -> dict:
             })
     return {
         "host": host,
-        "mac": scanner[host]["addresses"].get("mac"),  # TODO: vendor lookup from this
+        "mac": scanner[host]["addresses"].get("mac"),
         "open_ports": open_ports,
     }
 
 
 def run_scan() -> dict:
     scanner = nmap.PortScanner()
-
     print(f"Discovering devices on {SUBNET} ...")
     hosts = discover_hosts(scanner, SUBNET)
     print(f"Found {len(hosts)} device(s). Checking ports...")
@@ -70,10 +65,25 @@ def run_scan() -> dict:
     return {"subnet": SUBNET, "devices": results}
 
 
+BACKEND_URL = "http://127.0.0.1:8000/scan"
+USER_TOKEN = "test123"
+
+
+def send_to_backend(scan_results: dict) -> dict:
+    response = requests.post(
+        BACKEND_URL,
+        json=scan_results,
+        headers={"x-user-token": USER_TOKEN},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 if __name__ == "__main__":
     scan_results = run_scan()
     print(json.dumps(scan_results, indent=2))
 
-    # TODO (week 3): POST scan_results to the backend instead of just
-    # printing it. Use `requests.post(...)` with an auth token — see
-    # backend/main.py for the endpoint it expects.
+    print("\nSending to backend...")
+    result = send_to_backend(scan_results)
+    print("\n--- Nemotron's explanation ---\n")
+    print(result["explanation"])
