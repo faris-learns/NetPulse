@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -19,6 +20,17 @@ from openai import OpenAI
 load_dotenv()
 
 app = FastAPI(title="NetPulse backend")
+
+# Lets the dashboard (a different origin from the browser's point of
+# view) actually call this API. Wide open ("*") is fine for a local
+# hackathon demo — you'd lock this down to your real dashboard's
+# domain before ever putting this on the public internet.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 TOKEN_FACTORY_API_KEY = os.getenv("TOKEN_FACTORY_API_KEY")
 
@@ -163,6 +175,9 @@ def receive_scan(payload: ScanPayload, x_user_token: str = Header(...)):
 
     diff = diff_scans(current, previous)
     explanation = explain_with_nemotron(current, diff)
+
+    current["explanation"] = explanation
+    current["diff"] = diff
 
     history[x_user_token] = current
     save_history(history)
