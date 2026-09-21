@@ -18,3 +18,6 @@ build/
 .DS_Store
 .vscode/
 .idea/
+
+# Scan history — this is real home network data, never commit it
+backend/data/
