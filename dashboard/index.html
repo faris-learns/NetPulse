@@ -272,6 +272,57 @@
     color: var(--text-muted);
   }
 
+  /* Token entry */
+  .token-form {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 32px 28px;
+  }
+
+  .token-form strong {
+    display: block;
+    color: var(--text);
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .token-form p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0 0 18px;
+  }
+
+  .token-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .token-row input {
+    flex: 1;
+    min-width: 200px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+
+  .token-row input:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 1px;
+  }
+
+  .token-error {
+    color: var(--amber);
+    font-size: 13px;
+    margin: 10px 0 0;
+  }
+
   @media (max-width: 520px) {
     .status-headline { font-size: 22px; }
     .status-meta { margin-left: 0; }
@@ -300,14 +351,37 @@
 </main>
 
 <script>
-  // TODO (week 6): replace with a real per-user token once the
-  // backend validates tokens for real — must match the agent's token.
-  const USER_TOKEN = "test123";
   const BACKEND_URL = "http://127.0.0.1:8000";
+  const STORAGE_KEY = "netpulse_token";
+  let USER_TOKEN = localStorage.getItem(STORAGE_KEY) || "";
 
   const content = document.getElementById("content");
   const subnetLabel = document.getElementById("subnet-label");
   const refreshBtn = document.getElementById("refresh-btn");
+
+  function renderTokenPrompt(errorMessage) {
+    content.innerHTML = `
+      <div class="token-form">
+        <strong>Enter your access token</strong>
+        <p>The same token you put in backend/.env and agent/.env — it's what keeps your network data private to you.</p>
+        <div class="token-row">
+          <input type="password" id="token-input" placeholder="Your NetPulse token" autocomplete="off" />
+          <button id="token-submit">Connect</button>
+        </div>
+        ${errorMessage ? `<p class="token-error">${escapeHtml(errorMessage)}</p>` : ""}
+      </div>
+    `;
+    document.getElementById("token-submit").addEventListener("click", () => {
+      const value = document.getElementById("token-input").value.trim();
+      if (!value) return;
+      USER_TOKEN = value;
+      localStorage.setItem(STORAGE_KEY, value);
+      loadLatest();
+    });
+    document.getElementById("token-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("token-submit").click();
+    });
+  }
 
   function renderLoading() {
     content.innerHTML = `
@@ -391,11 +465,21 @@
   }
 
   async function loadLatest() {
+    if (!USER_TOKEN) {
+      renderTokenPrompt();
+      return;
+    }
     renderLoading();
     try {
       const res = await fetch(`${BACKEND_URL}/latest`, {
         headers: { "x-user-token": USER_TOKEN }
       });
+      if (res.status === 401) {
+        localStorage.removeItem(STORAGE_KEY);
+        USER_TOKEN = "";
+        renderTokenPrompt("That token wasn't accepted — check it matches backend/.env exactly.");
+        return;
+      }
       if (res.status === 404) {
         renderEmpty();
         return;

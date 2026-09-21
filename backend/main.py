@@ -9,6 +9,7 @@ to explain what changed, and serves that to the dashboard.
 
 import json
 import os
+import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
@@ -33,6 +34,7 @@ app.add_middleware(
 )
 
 TOKEN_FACTORY_API_KEY = os.getenv("TOKEN_FACTORY_API_KEY")
+AGENT_AUTH_TOKEN = os.getenv("AGENT_AUTH_TOKEN")
 
 client = OpenAI(
     base_url="https://api.tokenfactory.nebius.com/v1/",
@@ -158,6 +160,18 @@ def explain_with_nemotron(current: dict, diff: dict | None) -> str:
     return response.choices[0].message.content
 
 
+def require_valid_token(x_user_token: str) -> None:
+    """
+    Real auth check: the caller's token must exactly match the one
+    secret you generated and put in your .env file. secrets.compare_digest
+    (rather than `==`) avoids leaking timing information an attacker
+    could use to guess the token one character at a time.
+    """
+    if not AGENT_AUTH_TOKEN:
+        raise HTTPException(status_code=500, detail="server missing AGENT_AUTH_TOKEN")
+    if not x_user_token or not secrets.compare_digest(x_user_token, AGENT_AUTH_TOKEN):
+        raise HTTPException(status_code=401, detail="invalid auth token")
+
 
 @app.post("/scan")
 def receive_scan(payload: ScanPayload, x_user_token: str = Header(...)):
@@ -165,9 +179,7 @@ def receive_scan(payload: ScanPayload, x_user_token: str = Header(...)):
     The agent pushes results here. x_user_token authenticates which
     user/agent this is — never trust an unauthenticated payload.
     """
-    # TODO (week 6): validate x_user_token against real user records
-    if not x_user_token:
-        raise HTTPException(status_code=401, detail="missing auth token")
+    require_valid_token(x_user_token)
 
     history = load_history()
     previous = history.get(x_user_token)
@@ -193,6 +205,8 @@ def receive_scan(payload: ScanPayload, x_user_token: str = Header(...)):
 @app.get("/latest")
 def latest_scan(x_user_token: str = Header(...)):
     """The dashboard calls this to display current status."""
+    require_valid_token(x_user_token)
+
     history = load_history()
     result = history.get(x_user_token)
     if not result:

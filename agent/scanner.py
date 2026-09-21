@@ -15,8 +15,13 @@ pushes scan results out. See README.md "Security principles".
 """
 
 import json
+import os
+
 import nmap
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SUBNET = "192.168.68.0/24"
 
@@ -66,7 +71,16 @@ def run_scan() -> dict:
 
 
 BACKEND_URL = "http://127.0.0.1:8000/scan"
-USER_TOKEN = "test123"
+
+# Read from agent/.env — never hardcode a real secret in the source
+# file itself. See agent/.env.example for the format.
+USER_TOKEN = os.getenv("AGENT_AUTH_TOKEN")
+
+if not USER_TOKEN:
+    raise SystemExit(
+        "AGENT_AUTH_TOKEN is not set. Copy .env.example to .env in the "
+        "agent folder and paste in your token."
+    )
 
 
 def send_to_backend(scan_results: dict) -> dict:
