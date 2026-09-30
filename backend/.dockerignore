@@ -1,0 +1,11 @@
+# Never bake secrets into the image — Nebius gets these as
+# environment variables at deploy time instead (step 5).
+.env
+
+# Real home network data — never ships inside the image either.
+data/
+
+__pycache__/
+*.pyc
+.venv/
+venv/

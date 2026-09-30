@@ -21,3 +21,5 @@ build/
 
 # Scan history — this is real home network data, never commit it
 backend/data/
+
+agent/scanner.log
