@@ -15,13 +15,42 @@ pushes scan results out. See README.md "Security principles".
 """
 
 import json
+import logging
 import os
+import sys
+from pathlib import Path
 
 import nmap
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+# Windows' console sometimes defaults to an older encoding that can't
+# display every character Nemotron might use in its text. Forcing
+# UTF-8 avoids that class of error entirely.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
+# Use an explicit path to .env rather than relying on the current
+# working directory — important once this runs unattended via Task
+# Scheduler, which may not start "inside" the agent folder the way
+# a terminal session does.
+AGENT_DIR = Path(__file__).parent
+load_dotenv(dotenv_path=AGENT_DIR / ".env")
+
+# Log to a file (so a scheduled, unattended run leaves a record you
+# can check afterward) AND to the console (so it still prints nicely
+# when you run it manually, same as before).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s",
+    handlers=[
+        logging.FileHandler(AGENT_DIR / "scanner.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 SUBNET = "192.168.68.0/24"
 
@@ -57,9 +86,9 @@ def scan_ports(scanner: nmap.PortScanner, host: str, ports: str) -> dict:
 
 def run_scan() -> dict:
     scanner = nmap.PortScanner()
-    print(f"Discovering devices on {SUBNET} ...")
+    logger.info(f"Discovering devices on {SUBNET} ...")
     hosts = discover_hosts(scanner, SUBNET)
-    print(f"Found {len(hosts)} device(s). Checking ports...")
+    logger.info(f"Found {len(hosts)} device(s). Checking ports...")
 
     results = []
     for host in hosts:
@@ -70,10 +99,8 @@ def run_scan() -> dict:
     return {"subnet": SUBNET, "devices": results}
 
 
-BACKEND_URL = "http://127.0.0.1:8000/scan"
+BACKEND_URL = "https://netpulse-backend-latest.onrender.com/scan"
 
-# Read from agent/.env — never hardcode a real secret in the source
-# file itself. See agent/.env.example for the format.
 USER_TOKEN = os.getenv("AGENT_AUTH_TOKEN")
 
 if not USER_TOKEN:
@@ -93,11 +120,20 @@ def send_to_backend(scan_results: dict) -> dict:
     return response.json()
 
 
-if __name__ == "__main__":
-    scan_results = run_scan()
-    print(json.dumps(scan_results, indent=2))
+def main() -> None:
+    try:
+        scan_results = run_scan()
+        logger.info(json.dumps(scan_results))
 
-    print("\nSending to backend...")
-    result = send_to_backend(scan_results)
-    print("\n--- Nemotron's explanation ---\n")
-    print(result["explanation"])
+        logger.info("Sending to backend...")
+        result = send_to_backend(scan_results)
+        logger.info("Nemotron's explanation:\n" + result["explanation"])
+    except Exception:
+        # Log the full error rather than letting it vanish silently
+        # when nothing is watching the terminal (e.g. a scheduled,
+        # unattended run at 3am).
+        logger.exception("Scan run failed")
+
+
+if __name__ == "__main__":
+    main()
